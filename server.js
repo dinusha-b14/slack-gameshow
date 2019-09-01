@@ -5,12 +5,118 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 const express = require('express');
+const axios = require('axios');
 
 const app = express();
 const PORT = process.env.PORT;
+const VERIFICATION_TOKEN = process.env.VERIFICATION_TOKEN;
+
+app.use(express.json()) // for parsing application/json
+app.use(express.urlencoded({ extended: true })) // for parsing application/x-www-form-urlencoded
 
 app.get('/', (req, res) => {
     res.send('Welcome to Gameshow!');
+});
+
+app.post('/start', async (req, res) => {
+    const { token, response_url: responseUrl } = req.body;
+
+    if (token !== VERIFICATION_TOKEN) {
+        res.status(403).end('Forbidden');
+    } else {
+        res.status(200).end();
+        const message = {
+            blocks: [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Welcome to Gameshow!",
+                        "emoji": true
+                    }
+                },
+                {
+                    "type": "actions",
+                    "elements": [
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Start Game"
+                            },
+                            "value": "start_game",
+                            "style": "primary"
+                        },
+                        {
+                            "type": "button",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Cancel"
+                            },
+                            "value": "cancel_game",
+                            "style": "danger"
+                        }
+                    ]
+                }
+            ]
+        };
+
+        try {
+            await axios.post(responseUrl, message);
+        } catch (err) {
+            console.log(err);
+        }
+    }
+});
+
+app.post('/buzz', async (req, res) => {
+    const { token, response_url: responseUrl, actions } = JSON.parse(req.body.payload);
+    const [{ value: actionValue }] =  actions;
+
+    let message = {};
+
+    if (token !== VERIFICATION_TOKEN) {
+        res.status(403).end('Forbidden');
+        return;
+    }
+
+    res.status(200).end();
+
+    if (actionValue === 'start_game') {
+        message = {
+            replace_original: true,
+            blocks: [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Game started!",
+                        "emoji": true
+                    }
+                }
+            ]
+        }
+    } else if (actionValue === 'cancel_game') {
+        message = {
+            replace_original: true,
+            blocks: [
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "plain_text",
+                        "text": "Game cancelled!",
+                        "emoji": true
+                    }
+                }
+            ]
+        }
+    }
+
+    try {
+        await axios.post(responseUrl, message);
+    } catch (err) {
+        console.log(err);
+    }
 });
 
 app.listen(PORT, () => console.log(`Gameshow app listening on port ${PORT}`));
