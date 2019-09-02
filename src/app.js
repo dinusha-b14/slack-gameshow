@@ -2,10 +2,9 @@
 
 const express = require('express');
 const axios = require('axios');
+const { verificationToken } = require('../lib/config');
 
 const app = express();
-
-const VERIFICATION_TOKEN = process.env.VERIFICATION_TOKEN;
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
@@ -17,7 +16,7 @@ app.get('/', (req, res) => {
 app.post('/start', async (req, res) => {
     const { token, response_url: responseUrl } = req.body;
 
-    if (token !== VERIFICATION_TOKEN) {
+    if (token !== verificationToken) {
         res.status(403).end('Forbidden');
     } else {
         res.status(200).end();
@@ -71,7 +70,7 @@ app.post('/buzz', async (req, res) => {
 
     let message = {};
 
-    if (token !== VERIFICATION_TOKEN) {
+    if (token !== verificationToken) {
         res.status(403).end('Forbidden');
         return;
     }

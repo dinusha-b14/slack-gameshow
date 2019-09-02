@@ -1,11 +1,7 @@
 'use strict';
 
-if (process.env.NODE_ENV !== 'production') {
-    require('dotenv').config();
-}
+const { port } = require('./lib/config');
 
 const app = require('./src/app');
 
-const PORT = process.env.PORT;
-
-app.listen(PORT, () => console.log(`Gameshow app listening on port ${PORT}`));
+app.listen(port, () => console.log(`Gameshow app listening on port ${port}`));

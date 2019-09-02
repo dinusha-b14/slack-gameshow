@@ -1,0 +1,8 @@
+{
+    "envVariables": {
+        "PORT": 3000,
+        "CLIENT_ID": null,
+        "CLIENT_SECRET": null,
+        "VERIFICATION_TOKEN": null
+    }
+}
