@@ -56,11 +56,7 @@ app.post('/start', async (req, res) => {
             ]
         };
 
-        try {
-            await axios.post(responseUrl, message);
-        } catch (err) {
-            console.log(err);
-        }
+        await axios.post(responseUrl, message);
     }
 });
 
