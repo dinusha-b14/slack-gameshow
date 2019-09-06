@@ -8,7 +8,7 @@ const { verificationToken } = require('../lib/config');
 const firestore = new Firestore();
 
 const getUserIds = text => {
-    const regex = /<@(U[0-9]+)/g;
+    const regex = /<@(U[A-Za-z0-9]+)/g;
     const userIds = [];
     while (true) {
         const match = regex.exec(text);
@@ -33,13 +33,13 @@ module.exports = {
     
             // Extract user IDs from the list of users passed in.
             const userIds = getUserIds(text);
-            
+
             // Initialize scores for each user.
             const scores = userIds.reduce((result, userId) => {
                 result[userId] = 0;
                 return result;
             }, {});
-    
+
             try {
                 await documentRef.create({
                     teamId,

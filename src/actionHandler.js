@@ -16,7 +16,13 @@ const cancelGame = async ({ responseUrl, teamId }) => {
 };
 
 const startGame = async ({ responseUrl, teamId }) => {
-    await axios.post(responseUrl, startGameMessage);
+    const documentRef = firestore.doc(`games/${teamId}`);
+
+    const document = await documentRef.get();
+
+    const documentData = document.data();
+
+    await axios.post(responseUrl, startGameMessage(documentData.scores));
 };
 
 const continueGame = async () => {

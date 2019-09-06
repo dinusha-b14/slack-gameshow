@@ -75,7 +75,7 @@ describe('POST /start', () => {
                         token: config.verificationToken,
                         response_url: responseUrl,
                         team_id: teamId,
-                        text: '<@U3287462873|user> <@U7457344589|user>'
+                        text: '<@UMYR57FST|user> <@USLY76FDY|user>'
                     });
     
                     const documentRef = firestore.doc(`games/${teamId}`);
@@ -89,8 +89,8 @@ describe('POST /start', () => {
                     expect(response.statusCode).to.equal(200);
                     expect(documentData.teamId).to.equal(teamId);
                     expect(documentData.scores).to.eql({
-                        'U3287462873': 0,
-                        'U7457344589': 0
+                        'UMYR57FST': 0,
+                        'USLY76FDY': 0
                     });
                 });
             });
@@ -113,7 +113,7 @@ describe('POST /start', () => {
                         token: config.verificationToken,
                         response_url: responseUrl,
                         team_id: teamId,
-                        text: '<@U3287462873|user> <@U7457344589|user>'
+                        text: '<@UMYR57FST|user> <@USLY76FDY|user>'
                     });
 
                     sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, gameAlreadyStartedMessage);
@@ -148,14 +148,28 @@ describe('POST /action', () => {
     });
 
     describe('when verification token is valid', () => {
+        const userScores = {
+            'U3287462873': 0,
+            'U7457344589': 0
+        };
+
         beforeEach(async () => {
             nock(responseUrlBasePath)
-                .post('/response-url', startGameMessage)
+                .post('/response-url', startGameMessage(userScores))
                 .reply(200);
         });
 
         describe('when actionValue is startGame', () => {
-            it('returns 200 OK and sends a message stating that the game has started', async () => {
+            beforeEach(async () => {
+                const documentRef = firestore.doc(`games/${teamId}`);
+
+                await documentRef.set({
+                    teamId,
+                    scores: userScores
+                });
+            });
+
+            it('returns 200 OK and sends a message stating that the game has started for the requested users', async () => {
                 const response = await request(app).post('/action').send({
                     payload: JSON.stringify({
                         token: config.verificationToken,
@@ -171,7 +185,7 @@ describe('POST /action', () => {
                     })
                 });
     
-                sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, startGameMessage);
+                sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, startGameMessage(userScores));
                 expect(response.statusCode).to.equal(200);
             });
         });
