@@ -3,24 +3,24 @@
 module.exports = {
     blocks: [
         {
-            type: "section",
+            type: 'section',
             text: {
-                type: "plain_text",
-                text: "Get ready to answer the next question!",
+                type: 'plain_text',
+                text: 'Get ready to answer the next question!',
                 emoji: true
             }
         },
         {
-            type: "actions",
+            type: 'actions',
             elements: [
                 {
-                    type: "button",
+                    type: 'button',
                     text: {
-                        type: "plain_text",
-                        text: "Buzz!!"
+                        type: 'plain_text',
+                        text: 'Buzz!!'
                     },
-                    value: "buzz",
-                    style: "primary"
+                    value: 'buzz',
+                    style: 'primary'
                 }
             ]
         }

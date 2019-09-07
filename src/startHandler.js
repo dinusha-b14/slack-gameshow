@@ -33,7 +33,6 @@ module.exports = {
     
             // Extract user IDs from the list of users passed in.
             const userIds = getUserIds(text);
-
             // Initialize scores for each user.
             const scores = userIds.reduce((result, userId) => {
                 result[userId] = 0;

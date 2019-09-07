@@ -2,8 +2,8 @@
 
 const axios = require('axios');
 const { Firestore } = require('@google-cloud/firestore');
-const { verificationToken } = require('../lib/config');
-const { startGameMessage, cancelGameMessage } = require('../messages');
+const { verificationToken, botUserAccessToken, imOpenUrl, postMessageUrl } = require('../lib/config');
+const { welcomeMessage, startGameMessage, cancelGameMessage, buzzerMessage } = require('../messages');
 
 const firestore = new Firestore();
 
@@ -20,7 +20,26 @@ const startGame = async ({ responseUrl, teamId }) => {
     const document = await documentRef.get();
     const documentData = document.data();
 
-    await axios.post(responseUrl, startGameMessage(documentData.scores));
+    const userIds = Object.keys(documentData.scores);
+
+    const imResponses = await Promise.all(userIds.map(user => (
+        axios.post(imOpenUrl, { user }, { headers: { 'Authorization': `Bearer ${botUserAccessToken}` } })
+    )));
+
+    const imChannelIds = imResponses.map(imResponse => imResponse.data.channel.id);
+
+    await Promise.all(imChannelIds.map(channel => (
+        axios.post(postMessageUrl, {
+            channel,
+            ...buzzerMessage
+        }, {
+            headers: {
+                'Authorization': `Bearer ${botUserAccessToken}`
+            }
+        })
+    )));
+
+    return axios.post(responseUrl, startGameMessage(documentData.scores));
 };
 
 const continueGame = async () => {
