@@ -8,7 +8,16 @@ const sinon = require('sinon');
 const { Firestore } = require('@google-cloud/firestore');
 const app = require('../src/app');
 const config = require('../lib/config');
-const { welcomeMessage, gameAlreadyStartedMessage, startGameMessage, buzzerMessage, cancelGameMessage } = require('../messages');
+const {
+    welcomeMessage,
+    gameAlreadyStartedMessage,
+    startGameMessage,
+    buzzerMessage,
+    cancelGameMessage,
+    userAlreadyBuzzed,
+    userBuzzedFirst,
+    buzzedNotification
+} = require('../messages');
 
 const responseUrlBasePath = 'https://response.url.com';
 const slackApiBasePath = 'https://slack.com/api';
@@ -18,6 +27,7 @@ const sandbox = sinon.createSandbox();
 const firestore = new Firestore();
 const responseUrl = `${responseUrlBasePath}/response-url`;
 const teamId = 'my-team-id';
+const channelId = 'my-channel-id';
 
 let axiosSpy;
 
@@ -56,20 +66,28 @@ describe('POST /start', () => {
 
     describe('when verification token is valid', () => {
         beforeEach(async () => {
-            nock(responseUrlBasePath)
-                .post('/response-url', welcomeMessage)
-                .reply(200);
-            
-            nock(responseUrlBasePath)
-                .post('/response-url', gameAlreadyStartedMessage)
-                .reply(200);
-
             // Clean up any existing docs with the testing team ID
             try {
                 await firestore.doc(`games/${teamId}`).delete();
             } catch (err) {
                 // We can ignore any errors during this deletion.
             }
+
+            nock(slackApiBasePath, {
+                reqheaders: {
+                    'Authorization': `Bearer ${config.botUserAccessToken}`
+                }
+            })
+                .post('/chat.postMessage', { channel: channelId, ...welcomeMessage })
+                .reply(200);
+            
+            nock(slackApiBasePath, {
+                reqheaders: {
+                    'Authorization': `Bearer ${config.botUserAccessToken}`
+                }
+            })
+                .post('/chat.postMessage', { channel: channelId, ...gameAlreadyStartedMessage })
+                .reply(200);
         });
 
         describe('when users are provided correctly', () => {
@@ -79,6 +97,7 @@ describe('POST /start', () => {
                         token: config.verificationToken,
                         response_url: responseUrl,
                         team_id: teamId,
+                        channel_id: channelId,
                         text: '<@UMYR57FST|user> <@USLY76FDY|user>'
                     });
     
@@ -88,10 +107,11 @@ describe('POST /start', () => {
 
                     const documentData = document.data();
                     
-                    sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, welcomeMessage);
+                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: channelId, ...welcomeMessage });
 
                     expect(response.statusCode).to.equal(200);
                     expect(documentData.teamId).to.equal(teamId);
+                    expect(documentData.channelId).to.equal(channelId);
                     expect(documentData.scores).to.eql({
                         'UMYR57FST': 0,
                         'USLY76FDY': 0
@@ -105,6 +125,7 @@ describe('POST /start', () => {
 
                     await documentRef.create({
                         teamId,
+                        channelId,
                         scores: {
                             'U3287462873': 0,
                             'U7457344589': 0
@@ -117,10 +138,11 @@ describe('POST /start', () => {
                         token: config.verificationToken,
                         response_url: responseUrl,
                         team_id: teamId,
+                        channel_id: channelId,
                         text: '<@UMYR57FST|user> <@USLY76FDY|user>'
                     });
 
-                    sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, gameAlreadyStartedMessage);
+                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: channelId, ...gameAlreadyStartedMessage });
                     expect(response.statusCode).to.equal(200);
                 });
             });
@@ -198,6 +220,7 @@ describe('POST /action', () => {
 
             await documentRef.set({
                 teamId,
+                channelId,
                 scores: userScores
             });
         });
@@ -260,6 +283,7 @@ describe('POST /action', () => {
 
                     await documentRef.set({
                         teamId,
+                        channelId,
                         scores: userScores,
                         buzzerMessagesData: [
                             {
@@ -326,6 +350,7 @@ describe('POST /action', () => {
 
                     await documentRef.set({
                         teamId,
+                        channelId,
                         scores: userScores
                     }); 
                 });
@@ -346,7 +371,6 @@ describe('POST /action', () => {
                         })
                     });
 
-
                     const documentRef = firestore.doc(`games/${teamId}`);
 
                     const doc = await documentRef.get();
@@ -354,6 +378,139 @@ describe('POST /action', () => {
                     sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, cancelGameMessage);
                     expect(response.statusCode).to.equal(200);
                     expect(doc.exists).to.equal(false);
+                });
+            });
+        });
+
+        describe('when actionValue is buzz', () => {
+            const buzzedInUser = 'USLY76FDY';
+            const buzzedInUserChannel = 'D23564GHG';
+
+            describe('when user has already buzzed in', () => {
+                beforeEach(async () => {
+                    const documentRef = firestore.doc(`games/${teamId}`);
+
+                    await documentRef.set({
+                        teamId,
+                        channelId,
+                        scores: userScores,
+                        buzzedUser: 'UMYR57FST'
+                    });
+
+                    nock(responseUrlBasePath)
+                        .post('/response-url', userAlreadyBuzzed)
+                        .reply(200);
+                });
+
+                it('returns 200 OK and mentions that another user has already buzzed in', async () => {
+                    const response = await request(app).post('/action').send({
+                        payload: JSON.stringify({
+                            token: config.verificationToken,
+                            response_url: responseUrl,
+                            team: {
+                                id: teamId
+                            },
+                            user: {
+                                id: buzzedInUser
+                            },
+                            channel: {
+                                id: buzzedInUserChannel
+                            },
+                            actions: [
+                                {
+                                    value: 'buzz'
+                                }
+                            ]
+                        })
+                    });
+
+                    sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, userAlreadyBuzzed);
+                    expect(response.statusCode).to.equal(200);
+                });
+            });
+
+            describe('when user is first to buzz in', () => {
+                beforeEach(async () => {
+                    const documentRef = firestore.doc(`games/${teamId}`);
+
+                    await documentRef.set({
+                        teamId,
+                        channelId,
+                        scores: userScores,
+                        buzzerMessagesData: [
+                            {
+                                channel: 'D2346XH78',
+                                ts: '2384342786.3468723423'
+                            },
+                            {
+                                channel: 'D23564GHG',
+                                ts: '5468973453.3762384683'
+                            }
+                        ]
+                    });
+
+                    nock(responseUrlBasePath)
+                            .post('/response-url', userBuzzedFirst)
+                            .reply(200);
+                    
+                    nock(slackApiBasePath, {
+                        reqheaders: {
+                            'Authorization': `Bearer ${config.botUserAccessToken}`
+                        }
+                    })
+                        .post('/chat.postMessage', { channel: channelId, ...buzzedNotification(buzzedInUser) })
+                        .reply(200);
+                    
+                    nock(slackApiBasePath, {
+                        reqheaders: {
+                            'Authorization': `Bearer ${config.botUserAccessToken}`
+                        }
+                    })
+                        .post('/chat.delete', { channel: 'D2346XH78', ts: '2384342786.3468723423' })
+                        .reply(200);
+                    
+                    nock(slackApiBasePath, {
+                        reqheaders: {
+                            'Authorization': `Bearer ${config.botUserAccessToken}`
+                        }
+                    })
+                        .post('/chat.postMessage', { channel: 'D2346XH78', ...userAlreadyBuzzed })
+                        .reply(200);
+                });
+
+                it('returns 200 OK and mentions to the user that they buzzed in first', async () => {
+                    const response = await request(app).post('/action').send({
+                        payload: JSON.stringify({
+                            token: config.verificationToken,
+                            response_url: responseUrl,
+                            team: {
+                                id: teamId
+                            },
+                            user: {
+                                id: buzzedInUser
+                            },
+                            channel: {
+                                id: buzzedInUserChannel
+                            },
+                            actions: [
+                                {
+                                    value: 'buzz'
+                                }
+                            ]
+                        })
+                    });
+
+                    const documentRef = firestore.doc(`games/${teamId}`);
+
+                    const doc = await documentRef.get();
+                    const { buzzedUser } = doc.data();
+
+                    sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, userBuzzedFirst);
+                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: channelId, ...buzzedNotification(buzzedInUser)});
+                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D2346XH78', ...userAlreadyBuzzed });
+                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D2346XH78', ts: '2384342786.3468723423' });
+                    expect(response.statusCode).to.equal(200);
+                    expect(buzzedUser).to.equal(buzzedInUser);
                 });
             });
         });

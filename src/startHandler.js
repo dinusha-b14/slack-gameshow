@@ -3,7 +3,7 @@
 const axios = require('axios');
 const { Firestore } = require('@google-cloud/firestore');
 const { welcomeMessage, gameAlreadyStartedMessage } = require('../messages');
-const { verificationToken } = require('../lib/config');
+const { verificationToken, postMessageUrl, botUserAccessToken } = require('../lib/config');
 
 const firestore = new Firestore();
 
@@ -23,7 +23,7 @@ const getUserIds = text => {
 
 module.exports = {
     post: async (req, res) => {
-        const { token, response_url: responseUrl, team_id: teamId, text } = req.body;
+        const { token, team_id: teamId, channel_id: channelId, text } = req.body;
 
         if (token !== verificationToken) {
             res.status(403).end('Forbidden');
@@ -42,12 +42,27 @@ module.exports = {
             try {
                 await documentRef.create({
                     teamId,
-                    scores
+                    channelId,
+                    scores,
                 });
     
-                await axios.post(responseUrl, welcomeMessage);
+                await axios.post(postMessageUrl, {
+                    channel: channelId,
+                    ...welcomeMessage
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${botUserAccessToken}`
+                    }
+                });
             } catch (err) {
-                await axios.post(responseUrl, gameAlreadyStartedMessage);
+                await axios.post(postMessageUrl, {
+                    channel: channelId,
+                    ...gameAlreadyStartedMessage
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${botUserAccessToken}`
+                    }
+                });
             };
     
             res.status(200).end();
