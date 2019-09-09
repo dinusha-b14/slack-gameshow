@@ -18,11 +18,25 @@ module.exports = scores => {
                 type: 'section',
                 text: {
                     type: 'plain_text',
-                    text: 'Game started for the following users:',
+                    text: 'Scoresheet:',
                     emoji: true
                 }
             },
-            ...scoreSection
+            ...scoreSection,
+            {
+                type: "actions",
+                elements: [
+                    {
+                        type: "button",
+                        text: {
+                            type: "plain_text",
+                            text: "Finish Game"
+                        },
+                        value: "finishGame",
+                        style: "primary"
+                    }
+                ]
+            }
         ]
     };
 };

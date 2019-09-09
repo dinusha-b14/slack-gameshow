@@ -11,7 +11,7 @@ const config = require('../lib/config');
 const {
     welcomeMessage,
     gameAlreadyStartedMessage,
-    startGameMessage,
+    scoreSheet,
     buzzerMessage,
     cancelGameMessage,
     userAlreadyBuzzed,
@@ -181,7 +181,7 @@ describe('POST /action', () => {
 
         beforeEach(async () => {
             nock(responseUrlBasePath)
-                .post('/response-url', startGameMessage(userScores))
+                .post('/response-url', scoreSheet(userScores))
                 .reply(200);
             
             nock(slackApiBasePath, {
@@ -248,7 +248,7 @@ describe('POST /action', () => {
 
                 const documentData = document.data();
 
-                sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, startGameMessage(userScores));
+                sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, scoreSheet(userScores));
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/im.open`, { user: 'UMYR57FST' });
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/im.open`, { user: 'USLY76FDY' });
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D2346XH78', ...buzzerMessage });

@@ -2,7 +2,7 @@
 
 const welcomeMessage = require('./welcomeMessage');
 const gameAlreadyStartedMessage = require('./gameAlreadyStartedMessage');
-const startGameMessage = require('./startGameMessage');
+const scoreSheet = require('./scoreSheet');
 const cancelGameMessage = require('./cancelGameMessage');
 const buzzerMessage = require('./buzzerMessage');
 const userAlreadyBuzzed = require('./userAlreadyBuzzed');
@@ -12,7 +12,7 @@ const buzzedNotification = require('./buzzedNotification');
 module.exports = {
     welcomeMessage,
     gameAlreadyStartedMessage,
-    startGameMessage,
+    scoreSheet,
     cancelGameMessage,
     buzzerMessage,
     userAlreadyBuzzed,
