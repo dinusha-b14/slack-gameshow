@@ -8,7 +8,7 @@ const sinon = require('sinon');
 const { Firestore } = require('@google-cloud/firestore');
 const app = require('../src/app');
 const config = require('../lib/config');
-const { welcomeMessage, gameAlreadyStartedMessage, startGameMessage, buzzerMessage } = require('../messages');
+const { welcomeMessage, gameAlreadyStartedMessage, startGameMessage, buzzerMessage, cancelGameMessage } = require('../messages');
 
 const responseUrlBasePath = 'https://response.url.com';
 const slackApiBasePath = 'https://slack.com/api';
@@ -153,8 +153,8 @@ describe('POST /action', () => {
 
     describe('when verification token is valid', () => {
         const userScores = {
-            'USLY76FDY': 0,
-            'UMYR57FST': 0
+            'UMYR57FST': 0,
+            'USLY76FDY': 0
         };
 
         beforeEach(async () => {
@@ -203,7 +203,7 @@ describe('POST /action', () => {
         });
 
         describe('when actionValue is startGame', () => {
-            it('returns 200 OK and sends a message stating that the game has started for the requested users and individually messages each user with a buzz button', async () => {
+            it('returns 200 OK and sets up the game', async () => {
                 const response = await request(app).post('/action').send({
                     payload: JSON.stringify({
                         token: config.verificationToken,
@@ -219,6 +219,12 @@ describe('POST /action', () => {
                     })
                 });
 
+                const documentRef = firestore.doc(`games/${teamId}`);
+
+                const document = await documentRef.get();
+
+                const documentData = document.data();
+
                 sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, startGameMessage(userScores));
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/im.open`, { user: 'UMYR57FST' });
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/im.open`, { user: 'USLY76FDY' });
@@ -226,6 +232,90 @@ describe('POST /action', () => {
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D23564GHG', ...buzzerMessage });
 
                 expect(response.statusCode).to.equal(200);
+                expect(documentData.buzzerMessagesData).to.deep.include(
+                    {
+                        channel: 'D2346XH78',
+                        ts: '2384342786.3468723423'
+                    }
+                );
+                expect(documentData.buzzerMessagesData).to.deep.include(
+                    {
+                        channel: 'D23564GHG',
+                        ts: '5468973453.3762384683'
+                    }
+                );
+            });
+        });
+
+        describe('when actionValue is cancelGame', () => {
+            describe('when buzzerMessagesData exists', () => {
+                beforeEach(async () => {
+                    const documentRef = firestore.doc(`games/${teamId}`);
+
+                    await documentRef.set({
+                        teamId,
+                        scores: userScores,
+                        buzzerMessagesData: [
+                            {
+                                ts: '2384342786.3468723423',
+                                channel: 'D2346XH78'
+                            },
+                            {
+                                ts: '5468973453.3762384683',
+                                channel: 'D23564GHG'
+                            }
+                        ]
+                    });
+
+                    nock(responseUrlBasePath)
+                        .post('/response-url', cancelGameMessage)
+                        .reply(200);
+
+                    nock(slackApiBasePath, {
+                        reqheaders: {
+                            'Authorization': `Bearer ${config.botUserAccessToken}`
+                        }
+                    })
+                        .post('/chat.delete', { channel: 'D2346XH78', ts: '2384342786.3468723423' })
+                        .reply(200);
+                    
+                    nock(slackApiBasePath, {
+                        reqheaders: {
+                            'Authorization': `Bearer ${config.botUserAccessToken}`
+                        }
+                    })
+                        .post('/chat.delete', { channel: 'D23564GHG', ts: '5468973453.3762384683' })
+                        .reply(200);
+                });
+
+                it('returns 200 OK and cancels the game', async () => {
+                    const response = await request(app).post('/action').send({
+                        payload: JSON.stringify({
+                            token: config.verificationToken,
+                            response_url: responseUrl,
+                            team: {
+                                id: teamId
+                            },
+                            actions: [
+                                {
+                                    value: 'cancelGame'
+                                }
+                            ]
+                        })
+                    });
+
+
+                    const documentRef = firestore.doc(`games/${teamId}`);
+
+                    const doc = await documentRef.get();
+
+                    sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, cancelGameMessage);
+                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D2346XH78', ts: '2384342786.3468723423' });
+                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D23564GHG', ts: '5468973453.3762384683' });
+
+                    expect(response.statusCode).to.equal(200);
+                    expect(doc.exists).to.equal(false);
+                });
             });
         });
     });

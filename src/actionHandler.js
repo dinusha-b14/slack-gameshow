@@ -2,13 +2,30 @@
 
 const axios = require('axios');
 const { Firestore } = require('@google-cloud/firestore');
-const { verificationToken, botUserAccessToken, imOpenUrl, postMessageUrl } = require('../lib/config');
+const { verificationToken, botUserAccessToken, imOpenUrl, postMessageUrl, deleteMessageUrl } = require('../lib/config');
 const { welcomeMessage, startGameMessage, cancelGameMessage, buzzerMessage } = require('../messages');
 
 const firestore = new Firestore();
 
 const cancelGame = async ({ responseUrl, teamId }) => {
     const documentRef = firestore.doc(`games/${teamId}`);
+    const doc = await documentRef.get();
+    const docData = doc.data();
+
+    const { buzzerMessagesData } = docData;
+
+    if (buzzerMessagesData) {
+        await Promise.all(buzzerMessagesData.map(({ channel, ts }) => {
+            return axios.post(deleteMessageUrl, {
+                channel,
+                ts
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${botUserAccessToken}`
+                }
+            });
+        }));
+    }
 
     await documentRef.delete();
 
@@ -28,7 +45,7 @@ const startGame = async ({ responseUrl, teamId }) => {
 
     const imChannelIds = imResponses.map(imResponse => imResponse.data.channel.id);
 
-    await Promise.all(imChannelIds.map(channel => (
+    const buzzerResponses = await Promise.all(imChannelIds.map(channel => (
         axios.post(postMessageUrl, {
             channel,
             ...buzzerMessage
@@ -38,6 +55,15 @@ const startGame = async ({ responseUrl, teamId }) => {
             }
         })
     )));
+
+    const buzzerMessagesData = buzzerResponses.map(response => {
+        const { ts, channel } = response.data;
+        return { ts, channel };
+    });
+
+    await documentRef.update({
+        buzzerMessagesData: buzzerMessagesData
+    });
 
     return axios.post(responseUrl, startGameMessage(documentData.scores));
 };

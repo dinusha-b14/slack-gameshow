@@ -1,12 +1,12 @@
 'use strict';
 
 module.exports = scores => {
-    const scoreSection = Object.entries(scores).map(([userId, score]) => {
+    const scoreSection = Object.keys(scores).sort().map(userId => {
         return {
             type: 'section',
             text: {
                 type: 'mrkdwn',
-                text: `*<@${userId}>*: ${score}`
+                text: `*<@${userId}>*: ${scores[userId]}`
             }
         }
     });
