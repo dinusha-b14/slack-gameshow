@@ -248,6 +248,12 @@ describe('POST /action', () => {
         });
 
         describe('when actionValue is cancelGame', () => {
+            beforeEach(async () => {
+                nock(responseUrlBasePath)
+                    .post('/response-url', cancelGameMessage)
+                    .reply(200);
+            });
+
             describe('when buzzerMessagesData exists', () => {
                 beforeEach(async () => {
                     const documentRef = firestore.doc(`games/${teamId}`);
@@ -266,10 +272,6 @@ describe('POST /action', () => {
                             }
                         ]
                     });
-
-                    nock(responseUrlBasePath)
-                        .post('/response-url', cancelGameMessage)
-                        .reply(200);
 
                     nock(slackApiBasePath, {
                         reqheaders: {
@@ -313,6 +315,43 @@ describe('POST /action', () => {
                     sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D2346XH78', ts: '2384342786.3468723423' });
                     sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D23564GHG', ts: '5468973453.3762384683' });
 
+                    expect(response.statusCode).to.equal(200);
+                    expect(doc.exists).to.equal(false);
+                });
+            });
+
+            describe('when buzzerMessagesData does not exist', () => {
+                beforeEach(async () => {
+                    const documentRef = firestore.doc(`games/${teamId}`);
+
+                    await documentRef.set({
+                        teamId,
+                        scores: userScores
+                    }); 
+                });
+
+                it('returns 200 OK and cancels the game', async () => {
+                    const response = await request(app).post('/action').send({
+                        payload: JSON.stringify({
+                            token: config.verificationToken,
+                            response_url: responseUrl,
+                            team: {
+                                id: teamId
+                            },
+                            actions: [
+                                {
+                                    value: 'cancelGame'
+                                }
+                            ]
+                        })
+                    });
+
+
+                    const documentRef = firestore.doc(`games/${teamId}`);
+
+                    const doc = await documentRef.get();
+
+                    sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, cancelGameMessage);
                     expect(response.statusCode).to.equal(200);
                     expect(doc.exists).to.equal(false);
                 });
