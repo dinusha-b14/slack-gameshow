@@ -73,20 +73,12 @@ describe('POST /start', () => {
                 // We can ignore any errors during this deletion.
             }
 
-            nock(slackApiBasePath, {
-                reqheaders: {
-                    'Authorization': `Bearer ${config.botUserAccessToken}`
-                }
-            })
-                .post('/chat.postMessage', { channel: channelId, ...welcomeMessage })
+            nock(responseUrlBasePath)
+                .post('/response-url', welcomeMessage)
                 .reply(200);
             
-            nock(slackApiBasePath, {
-                reqheaders: {
-                    'Authorization': `Bearer ${config.botUserAccessToken}`
-                }
-            })
-                .post('/chat.postMessage', { channel: channelId, ...gameAlreadyStartedMessage })
+            nock(responseUrlBasePath)
+                .post('/response-url', gameAlreadyStartedMessage)
                 .reply(200);
         });
 
@@ -107,7 +99,7 @@ describe('POST /start', () => {
 
                     const documentData = document.data();
                     
-                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: channelId, ...welcomeMessage });
+                    sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, welcomeMessage);
 
                     expect(response.statusCode).to.equal(200);
                     expect(documentData.teamId).to.equal(teamId);
@@ -142,7 +134,7 @@ describe('POST /start', () => {
                         text: '<@UMYR57FST|user> <@USLY76FDY|user>'
                     });
 
-                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: channelId, ...gameAlreadyStartedMessage });
+                    sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, gameAlreadyStartedMessage);
                     expect(response.statusCode).to.equal(200);
                 });
             });

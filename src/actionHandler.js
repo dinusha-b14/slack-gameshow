@@ -179,8 +179,6 @@ const buzz = async payload => {
                 }
             });
 
-            console.log(otherUsersBuzzersData);
-
             await deleteUsersBuzzers(otherUsersBuzzersData);
 
             await Promise.all(otherUsersBuzzersData.map(({ channel }) => (

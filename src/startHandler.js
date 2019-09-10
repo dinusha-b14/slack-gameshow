@@ -23,7 +23,7 @@ const getUserIds = text => {
 
 module.exports = {
     post: async (req, res) => {
-        const { token, team_id: teamId, channel_id: channelId, text } = req.body;
+        const { response_url: responseUrl, token, team_id: teamId, channel_id: channelId, text } = req.body;
 
         if (token !== verificationToken) {
             res.status(403).end('Forbidden');
@@ -46,23 +46,9 @@ module.exports = {
                     scores,
                 });
     
-                await axios.post(postMessageUrl, {
-                    channel: channelId,
-                    ...welcomeMessage
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${botUserAccessToken}`
-                    }
-                });
+                await axios.post(responseUrl, welcomeMessage);
             } catch (err) {
-                await axios.post(postMessageUrl, {
-                    channel: channelId,
-                    ...gameAlreadyStartedMessage
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${botUserAccessToken}`
-                    }
-                });
+                await axios.post(responseUrl, gameAlreadyStartedMessage);
             };
     
             res.status(200).end();
