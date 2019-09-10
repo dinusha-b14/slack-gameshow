@@ -29,10 +29,11 @@ const teamId = 'my-team-id';
 const channelId = 'my-channel-id';
 const createdUserId = 'created-user-id';
 
-let axiosSpy;
+let axiosSpy, axiosSpyGet;
 
 beforeEach(() => {
     axiosSpy = sandbox.spy(axios, 'post');
+    axiosSpyGet = sandbox.spy(axios, 'get');
 });
 
 afterEach(() => {
@@ -56,7 +57,7 @@ describe('POST /start', () => {
                 token: 'some-other-token',
                 response_url: responseUrl,
                 team_id: 'my-team-id',
-                text: '<@U3287462873|user> <@U7457344589|user>',
+                text: '',
                 user_id: createdUserId
             });
 
@@ -84,6 +85,17 @@ describe('POST /start', () => {
         });
 
         describe('when users are provided correctly', () => {
+            beforeEach(async () => {
+                nock(slackApiBasePath)
+                    .get('/channels.info')
+                    .query({ channel: channelId, token: config.botUserAccessToken })
+                    .reply(200, {
+                        channel: {
+                            members: ['UMYR57FST', 'USLY76FDY']
+                        }
+                    });
+            });
+
             describe('when game has not already started', () => {
                 it('returns 200 OK and initializes a document with users scores and sends a welcome message to start the game', async () => {
                     const response = await request(app).post('/start').send({
@@ -91,7 +103,7 @@ describe('POST /start', () => {
                         response_url: responseUrl,
                         team_id: teamId,
                         channel_id: channelId,
-                        text: '<@UMYR57FST|user> <@USLY76FDY|user>',
+                        text: '',
                         user_id: createdUserId
                     });
     
@@ -100,8 +112,9 @@ describe('POST /start', () => {
                     const document = await documentRef.get();
 
                     const documentData = document.data();
-                    
+
                     sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, welcomeMessage);
+                    sandbox.assert.calledWith(axiosSpyGet, `${slackApiBasePath}/channels.info`, { params: { token: config.botUserAccessToken, channel: channelId } });
 
                     expect(response.statusCode).to.equal(200);
                     expect(documentData.teamId).to.equal(teamId);
