@@ -497,14 +497,13 @@ describe('POST /action', () => {
                     const documentRef = firestore.doc(`games/${teamId}`);
 
                     const doc = await documentRef.get();
-                    const { buzzedUser, buzzerMessagesData } = doc.data();
+                    const { buzzedUser } = doc.data();
 
                     sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postEphemeral`, { channel: channelId, user: createdUserId, ...buzzedNotification(buzzedInUser)});
                     sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D2346XH78', ts: '2384342786.3468723423' });
                     sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D23564GHG', ts: '5468973453.3762384683' });
                     expect(response.statusCode).to.equal(200);
                     expect(buzzedUser).to.equal(buzzedInUser);
-                    expect(buzzerMessagesData).to.equal(null);
                 });
             });
         });

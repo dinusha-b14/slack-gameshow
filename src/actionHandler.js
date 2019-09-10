@@ -191,10 +191,6 @@ const buzz = async payload => {
 
         if (buzzerMessagesData) {
             await deleteUsersBuzzers(buzzerMessagesData);
-
-            await documentRef.update({
-                buzzerMessagesData: null
-            });
         }
 
         return axios.post(postEphemeralMessageUrl, {
