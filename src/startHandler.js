@@ -13,7 +13,7 @@ const firestore = new Firestore();
 
 module.exports = {
     post: async (req, res) => {
-        const { response_url: responseUrl, token, team_id: teamId, channel_id: channelId, text, user_id: createdUserId } = req.body;
+        const { response_url: responseUrl, token, team_id: teamId, channel_id: channelId, user_id: createdUserId } = req.body;
 
         if (token !== verificationToken) {
             res.status(403).end('Forbidden');
@@ -32,7 +32,7 @@ module.exports = {
             const { channel: { members } } = channelInfoResponse.data;
 
             // Initialize scores for each user.
-            const scores = members.reduce((result, userId) => {
+            const scores = members.filter(member => member !== createdUserId).reduce((result, userId) => {
                 result[userId] = 0;
                 return result;
             }, {});

@@ -194,8 +194,7 @@ const nextQuestion = async payload => {
     });
 
     await documentRef.update({
-        buzzerMessagesData: newBuzzerMessagesData,
-        buzzedUser: null
+        buzzerMessagesData: newBuzzerMessagesData
     });
 
     return axios.post(responseUrl, scoreSheet({ scores, gameStatus: 'waiting' }));

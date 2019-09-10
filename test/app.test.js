@@ -92,7 +92,7 @@ describe('POST /start', () => {
                     .query({ channel: channelId, token: config.botUserAccessToken })
                     .reply(200, {
                         channel: {
-                            members: ['UMYR57FST', 'USLY76FDY']
+                            members: ['UMYR57FST', 'USLY76FDY', createdUserId]
                         }
                     });
             });
@@ -628,11 +628,93 @@ describe('POST /action', () => {
                 const documentRef = firestore.doc(`games/${teamId}`);
                 const doc = await documentRef.get();
 
-                const { buzzedUser, buzzerMessagesData, scores } = doc.data();
+                const { buzzedUser, scores } = doc.data();
 
                 sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, scoreSheet({ scores }));
                 expect(response.statusCode).to.equal(200);
                 expect(buzzedUser).to.equal(null);
+            });
+        });
+
+        describe('when actionValue is nextQuestion', () => {
+            beforeEach(async () => {
+                const documentRef = firestore.doc(`games/${teamId}`);
+
+                await documentRef.set({
+                    teamId,
+                    channelId,
+                    createdUserId,
+                    scores: userScores,
+                    buzzedUser: null,
+                    buzzerMessagesData: [
+                        {
+                            ts: '2384342786.3468723423',
+                            channel: 'D2346XH78'
+                        },
+                        {
+                            ts: '5468973453.3762384683',
+                            channel: 'D23564GHG'
+                        }
+                    ]
+                });
+
+                nock(responseUrlBasePath)
+                    .post('/response-url', scoreSheet({ scores: userScores, gameStatus: 'waiting' }))
+                    .reply(200);
+
+                nock(slackApiBasePath, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                    .post('/chat.postMessage', { channel: 'D2346XH78', ...buzzerMessage })
+                    .reply(200, { ok: true, channel: 'D2346XH78', ts: '36478273.234782943' });
+    
+                nock(slackApiBasePath, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                    .post('/chat.postMessage', { channel: 'D23564GHG', ...buzzerMessage })
+                    .reply(200, { ok: true, channel: 'D23564GHG', ts: '65376723.485739922' });
+            });
+
+            it('returns 200 OK and sends new buzzer messages to the contestants', async () => {
+                const response = await request(app).post('/action').send({
+                    payload: JSON.stringify({
+                        token: config.verificationToken,
+                        response_url: responseUrl,
+                        team: {
+                            id: teamId
+                        },
+                        actions: [
+                            {
+                                value: 'nextQuestion'
+                            }
+                        ]
+                    })
+                });
+
+                const documentRef = firestore.doc(`games/${teamId}`);
+                const doc = await documentRef.get();
+
+                const { buzzerMessagesData } = doc.data();
+
+                sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D2346XH78', ...buzzerMessage });
+                sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D23564GHG', ...buzzerMessage });
+                expect(response.statusCode).to.equal(200);
+                expect(buzzerMessagesData).to.deep.eql(
+                    [
+                        {
+                            ts: '36478273.234782943',
+                            channel: 'D2346XH78'
+                        },
+                        {
+                            ts: '65376723.485739922',
+                            channel: 'D23564GHG'
+                        }
+                    ]
+                )
             });
         });
     });
