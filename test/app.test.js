@@ -15,7 +15,6 @@ const {
     buzzerMessage,
     cancelGameMessage,
     userAlreadyBuzzed,
-    userBuzzedFirst,
     buzzedNotification
 } = require('../messages');
 
@@ -196,22 +195,6 @@ describe('POST /action', () => {
                 .post('/im.open', { user: 'USLY76FDY' })
                 .reply(200, { ok: true, channel: { id: 'D23564GHG' } });
 
-            nock(slackApiBasePath, {
-                reqheaders: {
-                    'Authorization': `Bearer ${config.botUserAccessToken}`
-                }
-            })
-                .post('/chat.postMessage', { channel: 'D2346XH78', ...buzzerMessage })
-                .reply(200, { ok: true, channel: 'D2346XH78', ts: '2384342786.3468723423' });
-
-            nock(slackApiBasePath, {
-                reqheaders: {
-                    'Authorization': `Bearer ${config.botUserAccessToken}`
-                }
-            })
-                .post('/chat.postMessage', { channel: 'D23564GHG', ...buzzerMessage })
-                .reply(200, { ok: true, channel: 'D23564GHG', ts: '5468973453.3762384683' });
-
             const documentRef = firestore.doc(`games/${teamId}`);
 
             await documentRef.set({
@@ -222,6 +205,24 @@ describe('POST /action', () => {
         });
 
         describe('when actionValue is startGame', () => {
+            beforeEach(async () => {
+                nock(slackApiBasePath, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                    .post('/chat.postMessage', { channel: 'D2346XH78', ...buzzerMessage })
+                    .reply(200, { ok: true, channel: 'D2346XH78', ts: '2384342786.3468723423' });
+    
+                nock(slackApiBasePath, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                    .post('/chat.postMessage', { channel: 'D23564GHG', ...buzzerMessage })
+                    .reply(200, { ok: true, channel: 'D23564GHG', ts: '5468973453.3762384683' });
+            });
+
             it('returns 200 OK and sets up the game', async () => {
                 const response = await request(app).post('/action').send({
                     payload: JSON.stringify({
@@ -540,7 +541,7 @@ describe('POST /action', () => {
                     }
                 })
                     .post('/chat.postMessage', { channel: 'D2346XH78', ...buzzerMessage })
-                    .reply(200);
+                    .reply(200, { ok: true, channel: 'D2346XH78', ts: '927387234.2346782348' });
                 
                 nock(slackApiBasePath, {
                     reqheaders: {
@@ -548,7 +549,7 @@ describe('POST /action', () => {
                     }
                 })
                     .post('/chat.postMessage', { channel: 'D23564GHG', ...buzzerMessage })
-                    .reply(200);
+                    .reply(200, { ok: true, channel: 'D23564GHG', ts: '3245762.237683475683' });
                 
                 nock(responseUrlBasePath)
                     .post('/response-url', scoreSheet({ scores: updatedUserScores }))
@@ -574,12 +575,106 @@ describe('POST /action', () => {
                 const documentRef = firestore.doc(`games/${teamId}`);
                 const doc = await documentRef.get();
 
-                const { scores } = doc.data();
+                const { scores, buzzerMessagesData } = doc.data();
 
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D2346XH78', ...buzzerMessage });
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D23564GHG', ...buzzerMessage });
                 expect(response.statusCode).to.equal(200);
                 expect(scores['UMYR57FST']).to.equal(1);
+                expect(buzzerMessagesData).to.deep.eql(
+                    [
+                        {
+                            ts: '927387234.2346782348',
+                            channel: 'D2346XH78'
+                        },
+                        {
+                            ts: '3245762.237683475683',
+                            channel: 'D23564GHG'
+                        }
+                    ]
+                )
+            });
+        });
+
+        describe('when actionValue is answerWrong', () => {
+            beforeEach(async () => {
+                const documentRef = firestore.doc(`games/${teamId}`);
+
+                await documentRef.set({
+                    teamId,
+                    channelId,
+                    createdUserId,
+                    scores: userScores,
+                    buzzedUser: 'UMYR57FST',
+                    buzzerMessagesData: [
+                        {
+                            ts: '2384342786.3468723423',
+                            channel: 'D2346XH78'
+                        },
+                        {
+                            ts: '5468973453.3762384683',
+                            channel: 'D23564GHG'
+                        }
+                    ]
+                });
+
+                nock(responseUrlBasePath)
+                    .post('/response-url', scoreSheet({ scores: userScores }))
+                    .reply(200);
+
+                nock(slackApiBasePath, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                    .post('/chat.postMessage', { channel: 'D2346XH78', ...buzzerMessage })
+                    .reply(200, { ok: true, channel: 'D2346XH78', ts: '927387234.2346782348' });
+
+                nock(slackApiBasePath, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                    .post('/chat.postMessage', { channel: 'D23564GHG', ...buzzerMessage })
+                    .reply(200, { ok: true, channel: 'D23564GHG', ts: '3245762.237683475683' });
+            });
+
+            it('returns 200 OK, leaves the scores the same and resends buzzers to contestants', async () => {
+                const response = await request(app).post('/action').send({
+                    payload: JSON.stringify({
+                        token: config.verificationToken,
+                        response_url: responseUrl,
+                        team: {
+                            id: teamId
+                        },
+                        actions: [
+                            {
+                                value: 'answerWrong'
+                            }
+                        ]
+                    })
+                });
+
+                const documentRef = firestore.doc(`games/${teamId}`);
+                const doc = await documentRef.get();
+
+                const { buzzedUser, buzzerMessagesData, scores } = doc.data();
+
+                sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, scoreSheet({ scores }));
+                sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D2346XH78', ...buzzerMessage });
+                sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D23564GHG', ...buzzerMessage });
+                expect(response.statusCode).to.equal(200);
+                expect(buzzerMessagesData).to.deep.eql([
+                    {
+                        ts: '927387234.2346782348',
+                        channel: 'D2346XH78'
+                    },
+                    {
+                        ts: '3245762.237683475683',
+                        channel: 'D23564GHG'
+                    }
+                ]);
+                expect(buzzedUser).to.equal(null);
             });
         });
     });
