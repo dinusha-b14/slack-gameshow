@@ -5,7 +5,7 @@ const headerMessage = gameStatus => {
         case 'continue':
             return 'Current scores:';
         case 'start':
-            return 'A new GameShow started for the following users:';
+            return 'A new GameShow has been started for the following users:';
         case 'finish':
             return 'GameShow ended. Here are the final scores:';
     }

@@ -446,10 +446,6 @@ describe('POST /action', () => {
                             }
                         ]
                     });
-
-                    nock(responseUrlBasePath)
-                            .post('/response-url', userBuzzedFirst)
-                            .reply(200);
                     
                     nock(slackApiBasePath, {
                         reqheaders: {
@@ -466,17 +462,17 @@ describe('POST /action', () => {
                     })
                         .post('/chat.delete', { channel: 'D2346XH78', ts: '2384342786.3468723423' })
                         .reply(200);
-                    
+
                     nock(slackApiBasePath, {
                         reqheaders: {
                             'Authorization': `Bearer ${config.botUserAccessToken}`
                         }
                     })
-                        .post('/chat.postMessage', { channel: 'D2346XH78', ...userAlreadyBuzzed })
+                        .post('/chat.delete', { channel: 'D23564GHG', ts: '5468973453.3762384683' })
                         .reply(200);
                 });
 
-                it('returns 200 OK and mentions to the user that they buzzed in first', async () => {
+                it('returns 200 OK and notifies the game host that a user has buzzed in', async () => {
                     const response = await request(app).post('/action').send({
                         payload: JSON.stringify({
                             token: config.verificationToken,
@@ -501,14 +497,14 @@ describe('POST /action', () => {
                     const documentRef = firestore.doc(`games/${teamId}`);
 
                     const doc = await documentRef.get();
-                    const { buzzedUser } = doc.data();
+                    const { buzzedUser, buzzerMessagesData } = doc.data();
 
-                    sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, userBuzzedFirst);
                     sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postEphemeral`, { channel: channelId, user: createdUserId, ...buzzedNotification(buzzedInUser)});
-                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D2346XH78', ...userAlreadyBuzzed });
                     sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D2346XH78', ts: '2384342786.3468723423' });
+                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D23564GHG', ts: '5468973453.3762384683' });
                     expect(response.statusCode).to.equal(200);
                     expect(buzzedUser).to.equal(buzzedInUser);
+                    expect(buzzerMessagesData).to.equal(null);
                 });
             });
         });

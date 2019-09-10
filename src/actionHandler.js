@@ -189,7 +189,15 @@ const buzz = async payload => {
             buzzedUser: userId
         });
 
-        await axios.post(postEphemeralMessageUrl, {
+        if (buzzerMessagesData) {
+            await deleteUsersBuzzers(buzzerMessagesData);
+
+            await documentRef.update({
+                buzzerMessagesData: null
+            });
+        }
+
+        return axios.post(postEphemeralMessageUrl, {
             channel: channelId,
             user: createdUserId,
             ...buzzedNotification(userId)
@@ -198,30 +206,7 @@ const buzz = async payload => {
             headers: {
                 'Authorization': `Bearer ${botUserAccessToken}`
             }
-        });
-
-        if (buzzerMessagesData) {
-            const otherUsersBuzzersData = buzzerMessagesData.filter(buzzerData => {
-                if(buzzerData.channel !== userChannelId) {
-                    return buzzerData;
-                }
-            });
-
-            await deleteUsersBuzzers(otherUsersBuzzersData);
-
-            await Promise.all(otherUsersBuzzersData.map(({ channel }) => (
-                axios.post(postMessageUrl, {
-                    channel,
-                    ...userAlreadyBuzzed
-                }, {
-                    headers: {
-                        'Authorization': `Bearer ${botUserAccessToken}`
-                    }
-                })
-            )));
-        }
-
-        return axios.post(responseUrl, userBuzzedFirst);       
+        });  
     }
 };
 
