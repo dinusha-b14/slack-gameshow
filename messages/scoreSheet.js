@@ -2,39 +2,94 @@
 
 const headerMessage = gameStatus => {
     switch (gameStatus) {
-        case 'continue':
-            return 'Current scores:';
         case 'start':
-            return 'A new GameShow has been started for the following users:';
+            return 'A new Gameshow has been started for the following contestants:';
         case 'finish':
-            return 'GameShow ended. Here are the final scores:';
+            return 'You have ended the Gameshow. Here are the final scores:';
+        default:
+            return 'The scores so far are:';
     }
 };
 
 const footerMessage = gameStatus => {
     if (gameStatus === 'finish') {
-        return {
-            type: 'section',
-            text: {
-                type: 'plain_text',
-                text: 'Congratulations to the winner!'
-            }
-        }
-    } else {
-        return {
-            type: 'actions',
-            elements: [
-                {
-                    type: 'button',
-                    text: {
-                        type: 'plain_text',
-                        text: 'Finish Game'
-                    },
-                    value: 'finishGame',
-                    style: 'danger'
+        return [
+            {
+                type: 'section',
+                text: {
+                    type: 'plain_text',
+                    text: 'Congratulations to the winner!'
                 }
-            ]
-        }
+            }
+        ]
+    } else if (gameStatus === 'start') {
+        return [
+                {
+                type: 'actions',
+                elements: [
+                    {
+                        type: 'button',
+                        text: {
+                            type: 'plain_text',
+                            text: 'Finish Game'
+                        },
+                        value: 'finishGame',
+                        style: 'danger'
+                    }
+                ]
+            }
+        ]
+    } else if (gameStatus === 'waiting') {
+        return [
+            {
+                type: "section",
+                text: {
+                    type: "plain_text",
+                    text: "Waiting for contestants to buzz in...",
+                    emoji: true
+                }
+            },
+            {
+                type: "actions",
+                elements: [
+                    {
+                        type: "button",
+                        text: {
+                            type: "plain_text",
+                            text: "Finish Game"
+                        },
+                        value: "finishGame",
+                        style: "danger"
+                    }
+                ]
+            }
+        ]
+    } else {
+        return [
+            {
+                type: 'actions',
+                elements: [
+                    {
+                        type: 'button',
+                        text: {
+                            type: 'plain_text',
+                            text: 'Next Question'
+                        },
+                        value: 'nextQuestion',
+                        style: 'primary'
+                    },
+                    {
+                        type: 'button',
+                        text: {
+                            type: 'plain_text',
+                            text: 'Finish Game'
+                        },
+                        value: 'finishGame',
+                        style: 'danger'
+                    }
+                ]
+            }
+        ]
     }
 };
 
@@ -61,7 +116,7 @@ module.exports = ({ scores, gameStatus = 'continue' }) => {
                 }
             },
             ...scoreSection,
-            footerMessage(gameStatus)
+            ...footerMessage(gameStatus)
         ]
     };
 };
