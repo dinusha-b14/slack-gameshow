@@ -1,6 +1,44 @@
 'use strict';
 
-module.exports = scores => {
+const headerMessage = gameStatus => {
+    switch (gameStatus) {
+        case 'continue':
+            return 'Current scores:';
+        case 'start':
+            return 'A new GameShow started for the following users:';
+        case 'finish':
+            return 'GameShow ended. Here are the final scores:';
+    }
+};
+
+const footerMessage = gameStatus => {
+    if (gameStatus === 'finish') {
+        return {
+            type: 'section',
+            text: {
+                type: 'plain_text',
+                text: 'Congratulations to the winner!'
+            }
+        }
+    } else {
+        return {
+            type: 'actions',
+            elements: [
+                {
+                    type: 'button',
+                    text: {
+                        type: 'plain_text',
+                        text: 'Finish Game'
+                    },
+                    value: 'finishGame',
+                    style: 'danger'
+                }
+            ]
+        }
+    }
+};
+
+module.exports = ({ scores, gameStatus = 'continue' }) => {
     const scoreSection = Object.keys(scores).sort().map(userId => {
         return {
             type: 'section',
@@ -18,25 +56,12 @@ module.exports = scores => {
                 type: 'section',
                 text: {
                     type: 'plain_text',
-                    text: 'Scoresheet:',
+                    text: `${headerMessage(gameStatus)}`,
                     emoji: true
                 }
             },
             ...scoreSection,
-            {
-                type: "actions",
-                elements: [
-                    {
-                        type: "button",
-                        text: {
-                            type: "plain_text",
-                            text: "Finish Game"
-                        },
-                        value: "finishGame",
-                        style: "primary"
-                    }
-                ]
-            }
+            footerMessage(gameStatus)
         ]
     };
 };

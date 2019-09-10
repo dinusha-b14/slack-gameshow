@@ -28,6 +28,7 @@ const firestore = new Firestore();
 const responseUrl = `${responseUrlBasePath}/response-url`;
 const teamId = 'my-team-id';
 const channelId = 'my-channel-id';
+const createdUserId = 'created-user-id';
 
 let axiosSpy;
 
@@ -56,7 +57,8 @@ describe('POST /start', () => {
                 token: 'some-other-token',
                 response_url: responseUrl,
                 team_id: 'my-team-id',
-                text: '<@U3287462873|user> <@U7457344589|user>'
+                text: '<@U3287462873|user> <@U7457344589|user>',
+                user_id: createdUserId
             });
 
             expect(response.statusCode).to.equal(403);
@@ -90,7 +92,8 @@ describe('POST /start', () => {
                         response_url: responseUrl,
                         team_id: teamId,
                         channel_id: channelId,
-                        text: '<@UMYR57FST|user> <@USLY76FDY|user>'
+                        text: '<@UMYR57FST|user> <@USLY76FDY|user>',
+                        user_id: createdUserId
                     });
     
                     const documentRef = firestore.doc(`games/${teamId}`);
@@ -104,6 +107,7 @@ describe('POST /start', () => {
                     expect(response.statusCode).to.equal(200);
                     expect(documentData.teamId).to.equal(teamId);
                     expect(documentData.channelId).to.equal(channelId);
+                    expect(documentData.createdUserId).to.equal(createdUserId);
                     expect(documentData.scores).to.eql({
                         'UMYR57FST': 0,
                         'USLY76FDY': 0
@@ -173,7 +177,7 @@ describe('POST /action', () => {
 
         beforeEach(async () => {
             nock(responseUrlBasePath)
-                .post('/response-url', scoreSheet(userScores))
+                .post('/response-url', scoreSheet({ scores: userScores, gameStatus: 'start' }))
                 .reply(200);
             
             nock(slackApiBasePath, {
@@ -240,7 +244,7 @@ describe('POST /action', () => {
 
                 const documentData = document.data();
 
-                sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, scoreSheet(userScores));
+                sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, scoreSheet({ scores: userScores, gameStatus: 'start' }));
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/im.open`, { user: 'UMYR57FST' });
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/im.open`, { user: 'USLY76FDY' });
                 sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D2346XH78', ...buzzerMessage });
@@ -385,6 +389,7 @@ describe('POST /action', () => {
                     await documentRef.set({
                         teamId,
                         channelId,
+                        createdUserId,
                         scores: userScores,
                         buzzedUser: 'UMYR57FST'
                     });
@@ -428,6 +433,7 @@ describe('POST /action', () => {
                     await documentRef.set({
                         teamId,
                         channelId,
+                        createdUserId,
                         scores: userScores,
                         buzzerMessagesData: [
                             {
@@ -450,7 +456,7 @@ describe('POST /action', () => {
                             'Authorization': `Bearer ${config.botUserAccessToken}`
                         }
                     })
-                        .post('/chat.postMessage', { channel: channelId, ...buzzedNotification(buzzedInUser) })
+                        .post('/chat.postEphemeral', { channel: channelId, user: createdUserId, ...buzzedNotification(buzzedInUser) })
                         .reply(200);
                     
                     nock(slackApiBasePath, {
@@ -498,7 +504,7 @@ describe('POST /action', () => {
                     const { buzzedUser } = doc.data();
 
                     sandbox.assert.calledWith(axiosSpy, `${responseUrlBasePath}/response-url`, userBuzzedFirst);
-                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: channelId, ...buzzedNotification(buzzedInUser)});
+                    sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postEphemeral`, { channel: channelId, user: createdUserId, ...buzzedNotification(buzzedInUser)});
                     sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.postMessage`, { channel: 'D2346XH78', ...userAlreadyBuzzed });
                     sandbox.assert.calledWith(axiosSpy, `${slackApiBasePath}/chat.delete`, { channel: 'D2346XH78', ts: '2384342786.3468723423' });
                     expect(response.statusCode).to.equal(200);
@@ -550,7 +556,7 @@ describe('POST /action', () => {
                     .reply(200);
                 
                 nock(responseUrlBasePath)
-                    .post('/response-url', scoreSheet(updatedUserScores))
+                    .post('/response-url', scoreSheet({ scores: updatedUserScores }))
                     .reply(200);
             });
 

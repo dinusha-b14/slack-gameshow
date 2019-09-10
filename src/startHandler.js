@@ -3,7 +3,11 @@
 const axios = require('axios');
 const { Firestore } = require('@google-cloud/firestore');
 const { welcomeMessage, gameAlreadyStartedMessage } = require('../messages');
-const { verificationToken, postMessageUrl, botUserAccessToken } = require('../lib/config');
+const {
+    verificationToken,
+    postMessageUrl,
+    botUserAccessToken
+} = require('../lib/config');
 
 const firestore = new Firestore();
 
@@ -23,7 +27,7 @@ const getUserIds = text => {
 
 module.exports = {
     post: async (req, res) => {
-        const { response_url: responseUrl, token, team_id: teamId, channel_id: channelId, text } = req.body;
+        const { response_url: responseUrl, token, team_id: teamId, channel_id: channelId, text, user_id: createdUserId } = req.body;
 
         if (token !== verificationToken) {
             res.status(403).end('Forbidden');
@@ -41,6 +45,7 @@ module.exports = {
 
             try {
                 await documentRef.create({
+                    createdUserId,
                     teamId,
                     channelId,
                     scores,
