@@ -221,13 +221,13 @@ module.exports = {
         if (token !== verificationToken) {
             res.status(403).end('Forbidden');
         } else {
+            res.status(200).end();
+
             const responseAction = actionMap[actionValue];
 
             if (responseAction) {
                 await responseAction(payload);
             }
-
-            res.status(200).end();
         }
     }
 };

@@ -18,6 +18,7 @@ module.exports = {
         if (token !== verificationToken) {
             res.status(403).end('Forbidden');
         } else {
+            res.status(200).end();
             // First check to see if a document with the team ID already exists
             const documentRef = firestore.doc(`games/${teamId}`);
     
@@ -49,8 +50,6 @@ module.exports = {
             } catch (err) {
                 await axios.post(responseUrl, gameAlreadyStartedMessage);
             };
-    
-            res.status(200).end();
         }
     }
 };
