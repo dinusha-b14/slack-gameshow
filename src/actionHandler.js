@@ -10,12 +10,14 @@ const {
     postEphemeralMessageUrl,
     deleteMessageUrl
 } = require('../lib/config');
+
 const {
     scoreSheet,
     cancelGameMessage,
     buzzerMessage,
     userAlreadyBuzzed,
-    buzzedNotification
+    buzzedNotification,
+    gameStartedMessage
 } = require('../messages');
 
 const firestore = new Firestore();
@@ -36,56 +38,24 @@ const deleteUsersBuzzers = async buzzerMessagesData => {
 const cancelGame = async payload => {
     const { response_url: responseUrl, team: { id: teamId } } = payload;
     const documentRef = firestore.doc(`games/${teamId}`);
-    const doc = await documentRef.get();
-    const docData = doc.data();
-
-    const { buzzerMessagesData } = docData;
-
-    if (buzzerMessagesData) {
-        await deleteUsersBuzzers(buzzerMessagesData);
-    }
-
     await documentRef.delete();
 
     await axios.post(responseUrl, cancelGameMessage);
 };
 
 const startGame = async payload => {
-    const { response_url: responseUrl, team: { id: teamId } } = payload;
-    const documentRef = firestore.doc(`games/${teamId}`);
-    const document = await documentRef.get();
-    const { scores } = document.data();
+    const { response_url: responseUrl, channel: { id: channel } } = payload;
 
+    axios.post(postMessageUrl, {
+        channel,
+        ...buzzerMessage
+    }, {
+        headers: {
+            'Authorization': `Bearer ${botUserAccessToken}`
+        }
+    })
 
-    const userIds = Object.keys(scores);
-
-    const imResponses = await Promise.all(userIds.map(user => (
-        axios.post(imOpenUrl, { user }, { headers: { 'Authorization': `Bearer ${botUserAccessToken}` } })
-    )));
-
-    const imChannelIds = imResponses.map(imResponse => imResponse.data.channel.id);
-
-    const buzzerResponses = await Promise.all(imChannelIds.map(channel => (
-        axios.post(postMessageUrl, {
-            channel,
-            ...buzzerMessage
-        }, {
-            headers: {
-                'Authorization': `Bearer ${botUserAccessToken}`
-            }
-        })
-    )));
-
-    const buzzerMessagesData = buzzerResponses.map(response => {
-        const { ts, channel } = response.data;
-        return { ts, channel };
-    });
-
-    await documentRef.update({
-        buzzerMessagesData
-    });
-
-    return axios.post(responseUrl, scoreSheet({ scores, gameStatus: 'start' }));
+    return axios.post(responseUrl, gameStartedMessage);
 };
 
 const continueGame = async payload => {
@@ -221,13 +191,13 @@ module.exports = {
         if (token !== verificationToken) {
             res.status(403).end('Forbidden');
         } else {
-            res.status(200).end();
-
             const responseAction = actionMap[actionValue];
 
             if (responseAction) {
                 await responseAction(payload);
             }
+
+            res.status(200).end();
         }
     }
 };

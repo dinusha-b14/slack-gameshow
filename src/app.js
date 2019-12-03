@@ -1,8 +1,6 @@
 'use strict';
 
 const express = require('express');
-const axios = require('axios');
-const { verificationToken } = require('../lib/config');
 const StartHandler = require('./startHandler');
 const ActionHandler = require('./actionHandler');
 
