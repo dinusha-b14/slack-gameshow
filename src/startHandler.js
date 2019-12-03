@@ -21,7 +21,8 @@ module.exports = {
                 await documentRef.create({
                     createdUserId,
                     teamId,
-                    channelId
+                    channelId,
+                    scores: {}
                 });
 
                 await axios.post(responseUrl, welcomeMessage);

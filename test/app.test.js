@@ -13,7 +13,9 @@ const {
     gameAlreadyStartedMessage,
     cancelGameMessage,
     gameStartedMessage,
-    buzzerMessage
+    buzzerMessage,
+    buzzedNotificationForHost,
+    buzzedNotificationForContestant
 } = require('../messages');
 
 const responseUrlBasePath = 'https://response.url.com';
@@ -83,8 +85,8 @@ describe('POST /start', () => {
             it('returns 200 OK', async () => {
                 const response = await request(app).post('/start').send(requestBody);
 
-                sandbox.assert.calledWith(axios.post, `${responseUrlBasePath}/response-url`, welcomeMessage);
-                sandbox.assert.neverCalledWith(axios.post, `${responseUrlBasePath}/response-url`, gameAlreadyStartedMessage);
+                sandbox.assert.calledWith(axios.post, responseUrl, welcomeMessage);
+                sandbox.assert.neverCalledWith(axios.post, responseUrl, gameAlreadyStartedMessage);
 
                 const documentRef = firestore.doc(`games/${teamId}`);
                 const document = await documentRef.get();
@@ -93,6 +95,7 @@ describe('POST /start', () => {
                 expect(documentData.teamId).to.equal(teamId);
                 expect(documentData.channelId).to.equal(channelId);
                 expect(documentData.createdUserId).to.equal(createdUserId);
+                expect(documentData.scores).to.eql({});
                 expect(response.statusCode).to.equal(200);
             });
         });
@@ -124,8 +127,8 @@ describe('POST /start', () => {
             it('returns 200 OK', async () => {
                 const response = await request(app).post('/start').send(requestBody);
 
-                sandbox.assert.neverCalledWith(axios.post, `${responseUrlBasePath}/response-url`, welcomeMessage);
-                sandbox.assert.calledWith(axios.post, `${responseUrlBasePath}/response-url`, gameAlreadyStartedMessage);
+                sandbox.assert.neverCalledWith(axios.post, responseUrl, welcomeMessage);
+                sandbox.assert.calledWith(axios.post, responseUrl, gameAlreadyStartedMessage);
 
                 expect(response.statusCode).to.equal(200);
             });
@@ -139,8 +142,20 @@ describe('POST /action', () => {
 
         await documentRef.set({
             teamId,
-            channelId
+            channelId,
+            createdUserId,
+            scores: {}
         });
+    });
+
+    afterEach(async () => {
+        const documentRef = firestore.doc(`games/${teamId}`);
+
+        try {
+            await documentRef.delete();
+        } catch(err) {
+            // do nothing.
+        }
     });
 
     describe('when verification token is invalid', () => {
@@ -233,10 +248,134 @@ describe('POST /action', () => {
                 })
             });
 
-            sandbox.assert.calledWith(axios.post, `${slackApiBasePath}/chat.postMessage`, { channel: 'D2346XH78', ...buzzerMessage });
-            sandbox.assert.calledWith(axios.post, `${responseUrlBasePath}/response-url`, gameStartedMessage);
+            sandbox.assert.calledWith(axios.post, config.postMessageUrl, { channel: 'D2346XH78', ...buzzerMessage });
+            sandbox.assert.calledWith(axios.post, responseUrl, gameStartedMessage);
 
             expect(response.statusCode).to.equal(200);
+        });
+    });
+
+    describe('when actionValue is buzz', () => {
+        const buzzedUserId = 'U0D15K92L';
+
+        describe('when a user has not already buzzed in', () => {
+            beforeEach(async () => {
+                nock(responseUrlBasePath)
+                    .post('/response-url', buzzedNotificationForContestant(buzzedUserId))
+                    .reply(200);
+                
+                nock(config.postEphemeralMessageUrl, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                    .post('', buzzedNotificationForHost(buzzedUserId))
+                    .reply(200);
+            });
+
+            it('returns 200 OK, sets the buzzed user in the DB and responds back to both the host and the buzzed user', async () => {
+                const response = await request(app).post('/action').send({
+                    payload: JSON.stringify({
+                        token: config.verificationToken,
+                        response_url: responseUrl,
+                        user: {
+                            id: buzzedUserId
+                        },
+                        team: {
+                            id: teamId
+                        },
+                        channel: {
+                            id: channelId
+                        },
+                        actions: [
+                            {
+                                value: 'buzz'
+                            }
+                        ]
+                    })
+                });
+
+                const docRef = firestore.doc(`games/${teamId}`);
+                const doc = await docRef.get();
+                const docData = doc.data();
+
+                sandbox.assert.calledWith(axios.post, responseUrl, buzzedNotificationForContestant(buzzedUserId));
+                sandbox.assert.calledWith(axios.post, config.postEphemeralMessageUrl, {
+                    channel: channelId,
+                    user: createdUserId,
+                    ...buzzedNotificationForHost(buzzedUserId)
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                });
+
+                expect(response.statusCode).to.equal(200);
+                expect(docData.buzzedUser).to.equal(buzzedUserId);
+            });
+        });
+
+        describe('when a user has already buzzed in and a different user buzzes in', () => {
+            beforeEach(async () => {
+                const docRef = firestore.doc(`games/${teamId}`);
+
+                await docRef.update({
+                    buzzedUser: buzzedUserId
+                });
+
+                nock(responseUrlBasePath)
+                    .post('/response-url', buzzedNotificationForContestant(buzzedUserId))
+                    .reply(200);
+                
+                nock(config.postEphemeralMessageUrl, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                    .post('', buzzedNotificationForHost(buzzedUserId))
+                    .reply(200);
+            });
+
+            it('returns 200 OK and does not send any further messages', async () => {
+                const response = await request(app).post('/action').send({
+                    payload: JSON.stringify({
+                        token: config.verificationToken,
+                        response_url: responseUrl,
+                        user: {
+                            id: 'U83JK7327'
+                        },
+                        team: {
+                            id: teamId
+                        },
+                        channel: {
+                            id: channelId
+                        },
+                        actions: [
+                            {
+                                value: 'buzz'
+                            }
+                        ]
+                    })
+                });
+
+                const docRef = firestore.doc(`games/${teamId}`);
+                const doc = await docRef.get();
+                const docData = doc.data();
+
+                sandbox.assert.neverCalledWith(axios.post, responseUrl, buzzedNotificationForContestant('U83JK7327'));
+                sandbox.assert.neverCalledWith(axios.post, config.postEphemeralMessageUrl, {
+                    channel: channelId,
+                    user: createdUserId,
+                    ...buzzedNotificationForHost('U83JK7327')
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                });
+
+                expect(response.statusCode).to.equal(200);
+                expect(docData.buzzedUser).to.equal(buzzedUserId);
+            });
         });
     });
 });

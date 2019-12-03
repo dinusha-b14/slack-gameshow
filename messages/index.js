@@ -8,7 +8,8 @@ const cancelGameMessage = require('./cancelGameMessage');
 const buzzerMessage = require('./buzzerMessage');
 const userAlreadyBuzzed = require('./userAlreadyBuzzed');
 const userBuzzedFirst = require('./userBuzzedFirst');
-const buzzedNotification = require('./buzzedNotification');
+const buzzedNotificationForHost = require('./buzzedNotificationForHost');
+const buzzedNotificationForContestant = require('./buzzedNotificationForContestant');
 
 module.exports = {
     welcomeMessage,
@@ -19,5 +20,6 @@ module.exports = {
     buzzerMessage,
     userAlreadyBuzzed,
     userBuzzedFirst,
-    buzzedNotification
+    buzzedNotificationForHost,
+    buzzedNotificationForContestant
 };

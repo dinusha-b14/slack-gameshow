@@ -15,8 +15,8 @@ const {
     scoreSheet,
     cancelGameMessage,
     buzzerMessage,
-    userAlreadyBuzzed,
-    buzzedNotification,
+    buzzedNotificationForHost,
+    buzzedNotificationForContestant,
     gameStartedMessage
 } = require('../messages');
 
@@ -111,33 +111,28 @@ const answerWrong = async payload => {
 };
 
 const buzz = async payload => {
-    const { user: { id: userId }, response_url: responseUrl, team: { id: teamId }, channel: { id: userChannelId} } = payload;
+    const { response_url: responseUrl, user: { id: userId }, team: { id: teamId }, channel: { id: channel } } = payload;
 
-    const documentRef = firestore.doc(`games/${teamId}`);
-    const document = await documentRef.get();
-    const { buzzedUser, channelId, buzzerMessagesData, createdUserId } = document.data();
+    const docRef = firestore.doc(`games/${teamId}`);
+    const doc = await docRef.get();
+    const { createdUserId, buzzedUser } = doc.data();
 
-    if (buzzedUser) {
-        return axios.post(responseUrl, userAlreadyBuzzed);
-    } else {
-        await documentRef.update({
+    if (!buzzedUser) {
+        await docRef.update({
             buzzedUser: userId
         });
-
-        if (buzzerMessagesData) {
-            await deleteUsersBuzzers(buzzerMessagesData);
-        }
-
-        return axios.post(postEphemeralMessageUrl, {
-            channel: channelId,
+    
+        await axios.post(postEphemeralMessageUrl, {
+            channel,
             user: createdUserId,
-            ...buzzedNotification(userId)
-
+            ...buzzedNotificationForHost(userId)
         }, {
             headers: {
                 'Authorization': `Bearer ${botUserAccessToken}`
             }
-        });  
+        });
+
+        return axios.post(responseUrl, buzzedNotificationForContestant(userId));
     }
 };
 
