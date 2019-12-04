@@ -53,7 +53,7 @@ const startGame = async payload => {
         headers: {
             'Authorization': `Bearer ${botUserAccessToken}`
         }
-    })
+    });
 
     return axios.post(responseUrl, gameStartedMessage);
 };
@@ -85,16 +85,23 @@ const answerCorrect = async payload => {
 };
 
 const answerWrong = async payload => {
-    const { response_url: responseUrl, team: { id: teamId } } = payload;
+    const { response_url: responseUrl, channel: { id: channel }, team: { id: teamId } } = payload;
     const documentRef = firestore.doc(`games/${teamId}`);
-    const document = await documentRef.get();
-    const { scores } = document.data();
 
     await documentRef.update({
         buzzedUser: null
     });
 
-    return axios.post(responseUrl, scoreSheet({ scores }));
+    axios.post(postMessageUrl, {
+        channel,
+        ...buzzerMessage
+    }, {
+        headers: {
+            'Authorization': `Bearer ${botUserAccessToken}`
+        }
+    });
+
+    return axios.post(responseUrl, { replace_original: true, text: 'Game continued' });
 };
 
 const buzz = async payload => {
