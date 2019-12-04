@@ -469,6 +469,12 @@ describe('POST /action', () => {
     describe('when actionValue is allocatePoints', () => {
         const buzzedUserId = 'U0D15K92L';
 
+        beforeEach(async () => {
+            nock(responseUrlBasePath)
+                .post('/response-url', gameContinuationMessage)
+                .reply(200);
+        });
+
         describe('when user has not already been assigned a score', () => {
             beforeEach(async () => {
                 const docRef = firestore.doc(`games/${teamId}`);
@@ -476,10 +482,6 @@ describe('POST /action', () => {
                 await docRef.update({
                     buzzedUser: buzzedUserId
                 });
-    
-                nock(responseUrlBasePath)
-                    .post('/response-url', gameContinuationMessage)
-                    .reply(200);
     
                 nock(slackApiBasePath, {
                     reqheaders: {
@@ -529,6 +531,69 @@ describe('POST /action', () => {
                 expect(response.statusCode).to.equal(200);
                 expect(docData.scores).to.eql({
                     'U0D15K92L': 5
+                });
+            });
+        });
+
+        describe('when user has already been assigned a score', () => {
+            beforeEach(async () => {
+                const docRef = firestore.doc(`games/${teamId}`);
+    
+                await docRef.update({
+                    scores: {
+                        'U0D15K92L': 3
+                    },
+                    buzzedUser: buzzedUserId
+                });
+    
+                nock(slackApiBasePath, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                    .post('/chat.postMessage', { channel: channelId, ...scoreSheet({ scores: { 'U0D15K92L': 8 } }) })
+                    .reply(200, { ok: true, channel: channelId, ts: '2384342786.3468723423' });
+            });
+
+            it('returns 200 OK, updates the scores and sends the scoresheet to the channel and a continuation message to the host', async () => {
+                const response = await request(app).post('/action').send({
+                    payload: JSON.stringify({
+                        token: config.verificationToken,
+                        response_url: responseUrl,
+                        team: {
+                            id: teamId
+                        },
+                        channel: {
+                            id: channelId
+                        },
+                        actions: [
+                            {
+                                action_id: 'allocatePoints',
+                                selected_option: {
+                                    value: '5'
+                                }
+                            }
+                        ]
+                    })
+                });
+
+                const docRef = firestore.doc(`games/${teamId}`);
+                const doc = await docRef.get();
+                const docData = doc.data();
+    
+                sandbox.assert.calledWith(axios.post, responseUrl, gameContinuationMessage);
+                sandbox.assert.calledWith(axios.post, config.postMessageUrl, {
+                    channel: channelId,
+                    ...scoreSheet({ scores: { 'U0D15K92L': 8 } })
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                });
+
+                expect(response.statusCode).to.equal(200);
+                expect(docData.scores).to.eql({
+                    'U0D15K92L': 8
                 });
             });
         });
