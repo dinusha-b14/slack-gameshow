@@ -2,8 +2,6 @@
 
 const headerMessage = gameStatus => {
     switch (gameStatus) {
-        case 'start':
-            return 'A new Gameshow has been started for the following contestants:';
         case 'finish':
             return 'You have ended the Gameshow. Here are the final scores:';
         default:
@@ -22,84 +20,20 @@ const footerMessage = gameStatus => {
                 }
             }
         ]
-    } else if (gameStatus === 'start') {
-        return [
-                {
-                type: 'actions',
-                elements: [
-                    {
-                        type: 'button',
-                        text: {
-                            type: 'plain_text',
-                            text: 'Finish Game'
-                        },
-                        value: 'finishGame',
-                        style: 'danger'
-                    }
-                ]
-            }
-        ]
-    } else if (gameStatus === 'waiting') {
-        return [
-            {
-                type: "section",
-                text: {
-                    type: "plain_text",
-                    text: "Waiting for contestants to buzz in...",
-                    emoji: true
-                }
-            },
-            {
-                type: "actions",
-                elements: [
-                    {
-                        type: "button",
-                        text: {
-                            type: "plain_text",
-                            text: "Finish Game"
-                        },
-                        value: "finishGame",
-                        style: "danger"
-                    }
-                ]
-            }
-        ]
     } else {
-        return [
-            {
-                type: 'actions',
-                elements: [
-                    {
-                        type: 'button',
-                        text: {
-                            type: 'plain_text',
-                            text: 'Next Question'
-                        },
-                        value: 'nextQuestion',
-                        style: 'primary'
-                    },
-                    {
-                        type: 'button',
-                        text: {
-                            type: 'plain_text',
-                            text: 'Finish Game'
-                        },
-                        value: 'finishGame',
-                        style: 'danger'
-                    }
-                ]
-            }
-        ]
+        return []
     }
 };
 
 module.exports = ({ scores, gameStatus = 'continue' }) => {
-    const scoreSection = Object.keys(scores).sort().map(userId => {
+    const scoreSection = Object.entries(scores).sort((a, b) => (
+        a[1] < b[1] ? 1 : a[1] > b[1] ? -1 : 0
+    )).map(([userId, score]) => {
         return {
             type: 'section',
             text: {
                 type: 'mrkdwn',
-                text: `*<@${userId}>*: ${scores[userId]}`
+                text: `*<@${userId}>*: ${score}`
             }
         }
     });
@@ -115,7 +49,8 @@ module.exports = ({ scores, gameStatus = 'continue' }) => {
                     emoji: true
                 }
             },
-            ...scoreSection
+            ...scoreSection,
+            ...footerMessage(gameStatus)
         ]
     };
 };

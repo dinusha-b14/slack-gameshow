@@ -18,13 +18,10 @@ const {
     buzzedNotificationForContestant,
     gameStartedMessage,
     pointsAllocationMessage,
-    gameContinuationMessage
+    gameContinuationMessage,
+    gameContinuedMessage,
+    gameFinishedMessage
 } = require('../messages');
-
-const gameContinuedMessage = {
-    replace_original: true,
-    text: 'Game continued'
-};
 
 const firestore = new Firestore();
 
@@ -52,7 +49,7 @@ const cancelGame = async payload => {
 const startGame = async payload => {
     const { response_url: responseUrl, channel: { id: channel } } = payload;
 
-    axios.post(postMessageUrl, {
+    await axios.post(postMessageUrl, {
         channel,
         ...buzzerMessage
     }, {
@@ -70,18 +67,23 @@ const continueGame = async payload => {
 };
 
 const finishGame = async payload => {
-    const { response_url: responseUrl, team: { id: teamId } } = payload;
+    const { response_url: responseUrl, channel: { id: channel }, team: { id: teamId } } = payload;
     const documentRef = firestore.doc(`games/${teamId}`);
     const doc = await documentRef.get();
-    const { scores, buzzerMessagesData } = doc.data();
-
-    if (buzzerMessagesData) {
-        await deleteUsersBuzzers(buzzerMessagesData);
-    }
+    const { scores } = doc.data();
 
     await documentRef.delete();
 
-    return axios.post(responseUrl, scoreSheet({ scores, gameStatus: 'finish' }));
+    await axios.post(postMessageUrl, {
+        channel,
+        ...scoreSheet({ scores, gameStatus: 'finish' })
+    }, {
+        headers: {
+            'Authorization': `Bearer ${botUserAccessToken}`
+        }
+    });
+
+    return axios.post(responseUrl, gameFinishedMessage);
 };
 
 const answerCorrect = async payload => {

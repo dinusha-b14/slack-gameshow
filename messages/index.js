@@ -10,6 +10,8 @@ const buzzedNotificationForHost = require('./buzzedNotificationForHost');
 const buzzedNotificationForContestant = require('./buzzedNotificationForContestant');
 const pointsAllocationMessage = require('./pointsAllocationMessage');
 const gameContinuationMessage = require('./gameContinuationMessage');
+const gameFinishedMessage = require('./gameFinishedMessage');
+const gameContinuedMessage = require('./gameContinuedMessage');
 
 module.exports = {
     welcomeMessage,
@@ -21,5 +23,7 @@ module.exports = {
     buzzedNotificationForHost,
     buzzedNotificationForContestant,
     pointsAllocationMessage,
-    gameContinuationMessage
+    gameContinuationMessage,
+    gameFinishedMessage,
+    gameContinuedMessage
 };

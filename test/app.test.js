@@ -18,6 +18,8 @@ const {
     buzzedNotificationForContestant,
     pointsAllocationMessage,
     gameContinuationMessage,
+    gameContinuedMessage,
+    gameFinishedMessage,
     scoreSheet
 } = require('../messages');
 
@@ -416,7 +418,7 @@ describe('POST /action', () => {
     describe('when actionValue is answerWrong', () => {
         beforeEach(async () => {
             nock(responseUrlBasePath)
-                .post('/response-url', { replace_original: true, text: 'Game continued' })
+                .post('/response-url', gameContinuedMessage)
                 .reply(200);
     
             nock(slackApiBasePath, {
@@ -447,7 +449,7 @@ describe('POST /action', () => {
                 })
             });
 
-            sandbox.assert.calledWith(axios.post, responseUrl, { replace_original: true, text: 'Game continued' });
+            sandbox.assert.calledWith(axios.post, responseUrl, gameContinuedMessage);
             sandbox.assert.calledWith(axios.post, config.postMessageUrl, {
                 channel: channelId,
                 ...buzzerMessage
@@ -551,7 +553,14 @@ describe('POST /action', () => {
                         'Authorization': `Bearer ${config.botUserAccessToken}`
                     }
                 })
-                    .post('/chat.postMessage', { channel: channelId, ...scoreSheet({ scores: { 'U0D15K92L': 8 } }) })
+                    .post('/chat.postMessage', {
+                        channel: channelId,
+                        ...scoreSheet({ scores: { 'U0D15K92L': 8 }
+                    }, {
+                        headers: {
+                            'Authorization': `Bearer ${config.botUserAccessToken}`
+                        }
+                    }) })
                     .reply(200, { ok: true, channel: channelId, ts: '2384342786.3468723423' });
             });
 
@@ -602,7 +611,7 @@ describe('POST /action', () => {
     describe('when actionValue is nextQuestion', () => {
         beforeEach(async () => {
             nock(responseUrlBasePath)
-                .post('/response-url', { replace_original: true, text: 'Game continued' })
+                .post('/response-url', gameContinuedMessage)
                 .reply(200);
     
             nock(slackApiBasePath, {
@@ -610,7 +619,14 @@ describe('POST /action', () => {
                         'Authorization': `Bearer ${config.botUserAccessToken}`
                     }
                 })
-                .post('/chat.postMessage', { channel: channelId, ...buzzerMessage })
+                .post('/chat.postMessage', {
+                    channel: channelId,
+                    ...buzzerMessage
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
                 .reply(200, { ok: true, channel: channelId, ts: '2384342786.3468723423' });
         });
 
@@ -633,7 +649,7 @@ describe('POST /action', () => {
                 })
             });
 
-            sandbox.assert.calledWith(axios.post, responseUrl, { replace_original: true, text: 'Game continued' });
+            sandbox.assert.calledWith(axios.post, responseUrl, gameContinuedMessage);
             sandbox.assert.calledWith(axios.post, config.postMessageUrl, {
                 channel: channelId,
                 ...buzzerMessage
@@ -649,6 +665,77 @@ describe('POST /action', () => {
 
             expect(response.statusCode).to.equal(200);
             expect(docData.buzzedUser).to.equal(null);
+        });
+    });
+
+    describe('when actionValue is finishGame', () => {
+        const scores = {
+            'U8723842': 5,
+            'U7263483': 8
+        };
+
+        beforeEach(async () => {
+            const docRef = firestore.doc(`games/${teamId}`);
+    
+            await docRef.update({
+                scores
+            });
+
+            nock(responseUrlBasePath)
+                .post('/response-url', gameFinishedMessage)
+                .reply(200);
+
+            nock(slackApiBasePath, {
+                reqheaders: {
+                    'Authorization': `Bearer ${config.botUserAccessToken}`
+                }
+            })
+                .post('/chat.postMessage', {
+                    channel: channelId,
+                    ...scoreSheet({ scores, gameStatus: 'finish' })
+                }, {
+                    headers: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                .reply(200, { ok: true, channel: channelId, ts: '2384342786.3468723423' });
+        });
+
+        it('returns 200 OK, deletes the game record and sends the scoresheet and a game finished message to the host and contestants', async () => {
+            const response = await request(app).post('/action').send({
+                payload: JSON.stringify({
+                    token: config.verificationToken,
+                    response_url: responseUrl,
+                    team: {
+                        id: teamId
+                    },
+                    channel: {
+                        id: channelId
+                    },
+                    actions: [
+                        {
+                            value: 'finishGame'
+                        }
+                    ]
+                })
+            });
+
+            const documentRef = firestore.doc(`games/${teamId}`);
+
+            const doc = await documentRef.get();
+
+            sandbox.assert.calledWith(axios.post, responseUrl, gameFinishedMessage);
+            sandbox.assert.calledWith(axios.post, config.postMessageUrl, {
+                channel: channelId,
+                ...scoreSheet({ scores, gameStatus: 'finish' })
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${config.botUserAccessToken}`
+                }
+            });
+
+            expect(response.statusCode).to.equal(200);
+            expect(doc.exists).to.equal(false);
         });
     });
 });
