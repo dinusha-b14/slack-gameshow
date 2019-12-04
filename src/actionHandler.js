@@ -17,7 +17,8 @@ const {
     buzzedNotificationForHost,
     buzzedNotificationForContestant,
     gameStartedMessage,
-    pointsAllocationMessage
+    pointsAllocationMessage,
+    gameContinuationMessage
 } = require('../messages');
 
 const firestore = new Firestore();
@@ -92,7 +93,7 @@ const answerWrong = async payload => {
         buzzedUser: null
     });
 
-    axios.post(postMessageUrl, {
+    await axios.post(postMessageUrl, {
         channel,
         ...buzzerMessage
     }, {
@@ -159,6 +160,43 @@ const nextQuestion = async payload => {
     return axios.post(responseUrl, scoreSheet({ scores, gameStatus: 'waiting' }));
 };
 
+const allocatePoints = async payload => {
+    const {
+        response_url: responseUrl,
+        channel: { id: channel },
+        team: { id: teamId },
+        actions: [{ selected_option: { value: userPoints } }]
+    } = payload;
+
+    const numericPoints = Number(userPoints);
+    const documentRef = firestore.doc(`games/${teamId}`);
+    const document = await documentRef.get();
+    const { buzzedUser, scores = {} } = document.data();
+
+    const newScores = {
+        ...scores
+    };
+
+    newScores[buzzedUser]
+        ? newScores[buzzedUser] += numericPoints
+        : newScores[buzzedUser] = numericPoints;
+
+    await documentRef.update({
+        scores: newScores
+    });
+
+    await axios.post(postMessageUrl, {
+        channel,
+        ...scoreSheet({ scores: newScores })
+    }, {
+        headers: {
+            'Authorization': `Bearer ${botUserAccessToken}`
+        }
+    });
+
+    return axios.post(responseUrl, gameContinuationMessage);
+};
+
 const actionMap = {
     startGame,
     cancelGame,
@@ -167,7 +205,8 @@ const actionMap = {
     buzz,
     answerCorrect,
     answerWrong,
-    nextQuestion
+    nextQuestion,
+    allocatePoints
 };
 
 module.exports = {
@@ -175,12 +214,17 @@ module.exports = {
         // console.log(JSON.parse(req.body.payload));
         const payload = JSON.parse(req.body.payload);
         const { token, actions } = payload;
-        const [{ value: actionValue }] =  actions;
+        const [{ value: actionValue, action_id: actionId }] =  actions;
     
         if (token !== verificationToken) {
             res.status(403).end('Forbidden');
         } else {
-            const responseAction = actionMap[actionValue];
+            let responseAction;
+            if (actionValue) {
+                responseAction = actionMap[actionValue];
+            } else if (actionId) {
+                responseAction = actionMap[actionId];
+            }
 
             if (responseAction) {
                 await responseAction(payload);

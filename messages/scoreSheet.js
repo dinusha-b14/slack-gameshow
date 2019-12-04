@@ -115,8 +115,7 @@ module.exports = ({ scores, gameStatus = 'continue' }) => {
                     emoji: true
                 }
             },
-            ...scoreSection,
-            ...footerMessage(gameStatus)
+            ...scoreSection
         ]
     };
 };
