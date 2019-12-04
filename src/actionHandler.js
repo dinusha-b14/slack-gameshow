@@ -25,19 +25,6 @@ const {
 
 const firestore = new Firestore();
 
-const deleteUsersBuzzers = async buzzerMessagesData => {
-    await Promise.all(buzzerMessagesData.map(({ channel, ts }) => {
-        return axios.post(deleteMessageUrl, {
-            channel,
-            ts
-        }, {
-            headers: {
-                'Authorization': `Bearer ${botUserAccessToken}`
-            }
-        });
-    }));
-};
-
 const cancelGame = async payload => {
     const { response_url: responseUrl, team: { id: teamId } } = payload;
     const documentRef = firestore.doc(`games/${teamId}`);

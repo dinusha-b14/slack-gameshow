@@ -3,7 +3,7 @@
 const headerMessage = gameStatus => {
     switch (gameStatus) {
         case 'finish':
-            return 'You have ended the Gameshow. Here are the final scores:';
+            return 'The Gameshow has finished. Here are the final scores:';
         default:
             return 'The scores so far are:';
     }
