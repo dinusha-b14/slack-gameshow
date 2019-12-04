@@ -15,7 +15,8 @@ const {
     gameStartedMessage,
     buzzerMessage,
     buzzedNotificationForHost,
-    buzzedNotificationForContestant
+    buzzedNotificationForContestant,
+    pointsAllocationMessage
 } = require('../messages');
 
 const responseUrlBasePath = 'https://response.url.com';
@@ -377,6 +378,39 @@ describe('POST /action', () => {
                 expect(docData.buzzedUser).to.equal(buzzedUserId);
             });
         });
+    });
+
+    describe('when actionValue is answerCorrect', () => {
+        beforeEach(async () => {
+            nock(responseUrlBasePath)
+                .post('/response-url', pointsAllocationMessage)
+                .reply(200);
+        });
+
+        it('returns 200 OK and sends a points allocation message to the host', async () => {
+            const response = await request(app).post('/action').send({
+                payload: JSON.stringify({
+                    token: config.verificationToken,
+                    response_url: responseUrl,
+                    actions: [
+                        {
+                            value: 'answerCorrect'
+                        }
+                    ]
+                })
+            });
+
+            sandbox.assert.calledWith(axios.post, responseUrl, pointsAllocationMessage);
+            expect(response.statusCode).to.equal(200);
+        });
+    });
+
+    describe('when actionValue is answerWrong', () => {
+
+    });
+
+    describe('when actionValue is allocatePoints', () => {
+
     });
 });
 

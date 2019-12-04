@@ -10,6 +10,7 @@ const userAlreadyBuzzed = require('./userAlreadyBuzzed');
 const userBuzzedFirst = require('./userBuzzedFirst');
 const buzzedNotificationForHost = require('./buzzedNotificationForHost');
 const buzzedNotificationForContestant = require('./buzzedNotificationForContestant');
+const pointsAllocationMessage = require('./pointsAllocationMessage');
 
 module.exports = {
     welcomeMessage,
@@ -21,5 +22,6 @@ module.exports = {
     userAlreadyBuzzed,
     userBuzzedFirst,
     buzzedNotificationForHost,
-    buzzedNotificationForContestant
+    buzzedNotificationForContestant,
+    pointsAllocationMessage
 };

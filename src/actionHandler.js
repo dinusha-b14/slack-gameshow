@@ -5,7 +5,6 @@ const { Firestore } = require('@google-cloud/firestore');
 const {
     verificationToken,
     botUserAccessToken,
-    imOpenUrl,
     postMessageUrl,
     postEphemeralMessageUrl,
     deleteMessageUrl
@@ -17,7 +16,8 @@ const {
     buzzerMessage,
     buzzedNotificationForHost,
     buzzedNotificationForContestant,
-    gameStartedMessage
+    gameStartedMessage,
+    pointsAllocationMessage
 } = require('../messages');
 
 const firestore = new Firestore();
@@ -79,22 +79,9 @@ const finishGame = async payload => {
 };
 
 const answerCorrect = async payload => {
-    const { response_url: responseUrl, team: { id: teamId } } = payload;
-    const documentRef = firestore.doc(`games/${teamId}`);
-    const document = await documentRef.get();
-    const { buzzedUser, scores, channelId } = document.data();
+    const { response_url: responseUrl } = payload;
 
-    // increment score for user
-    let userScore = scores[buzzedUser];
-    userScore++;
-    scores[buzzedUser] = userScore;
-
-    await documentRef.update({
-        scores,
-        buzzedUser: null
-    });
-
-    return axios.post(responseUrl, scoreSheet({ scores }));
+    return axios.post(responseUrl, pointsAllocationMessage);
 };
 
 const answerWrong = async payload => {
