@@ -598,5 +598,58 @@ describe('POST /action', () => {
             });
         });
     });
+
+    describe('when actionValue is nextQuestion', () => {
+        beforeEach(async () => {
+            nock(responseUrlBasePath)
+                .post('/response-url', { replace_original: true, text: 'Game continued' })
+                .reply(200);
+    
+            nock(slackApiBasePath, {
+                    reqheaders: {
+                        'Authorization': `Bearer ${config.botUserAccessToken}`
+                    }
+                })
+                .post('/chat.postMessage', { channel: channelId, ...buzzerMessage })
+                .reply(200, { ok: true, channel: channelId, ts: '2384342786.3468723423' });
+        });
+
+        it('returns 200 OK and resets the buzzedUser attribute in the database to null', async () => {
+            const response = await request(app).post('/action').send({
+                payload: JSON.stringify({
+                    token: config.verificationToken,
+                    response_url: responseUrl,
+                    team: {
+                        id: teamId
+                    },
+                    channel: {
+                        id: channelId
+                    },
+                    actions: [
+                        {
+                            value: 'nextQuestion'
+                        }
+                    ]
+                })
+            });
+
+            sandbox.assert.calledWith(axios.post, responseUrl, { replace_original: true, text: 'Game continued' });
+            sandbox.assert.calledWith(axios.post, config.postMessageUrl, {
+                channel: channelId,
+                ...buzzerMessage
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${config.botUserAccessToken}`
+                }
+            });
+
+            const docRef = firestore.doc(`games/${teamId}`);
+            const doc = await docRef.get();
+            const docData = doc.data();
+
+            expect(response.statusCode).to.equal(200);
+            expect(docData.buzzedUser).to.equal(null);
+        });
+    });
 });
 
