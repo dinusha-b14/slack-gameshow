@@ -1,5 +1,5 @@
 Slack Gameshow!
-==========================================================
+===========================================================
 
 A Gameshow app for Slack that allows you to host a gameshow complete with buzzers
 for users and a score tracking system for each user.
